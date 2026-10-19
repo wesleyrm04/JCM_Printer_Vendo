@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JCM Vendo Admin</title>
+    <style>
+        :root { --primary: #343a40; --accent: #007bff; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: var(--bg); display: flex; }
+        .sidebar { width: 250px; background: var(--primary); color: white; height: 100vh; padding: 20px; }
+        .sidebar h2 { margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        .nav-link { display: block; color: white; text-decoration: none; padding: 10px; margin: 5px 0; border-radius: 5px; cursor: pointer; }
+        .nav-link:hover { background: #495057; }
+        .content { flex: 1; padding: 30px; overflow-y: auto; height: 100vh; box-sizing: border-box; }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f4f4f4; }
+        .btn { background: var(--accent); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        input[type="number"] { padding: 8px; width: 80px; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>Admin Panel</h2>
+        <a class="nav-link" onclick="loadDashboard()">Dashboard</a>
+        <a class="nav-link" onclick="loadPricing()">Pricing Management</a>
+        <a class="nav-link" onclick="loadHistory()">Transaction History</a>
+    </div>
+
+    <div class="content" id="main-content">
+        <!-- Content injected here via JS -->
+    </div>
+
+    <script>
+        async function fetchAPI(endpoint, method = 'GET', body = null) {
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) options.body = JSON.stringify(body);
+            const res = await fetch(`/api/v1/admin${endpoint}`, options);
+            return res.json();
+        }
+
+        async function loadDashboard() {
+            const data = await fetchAPI('/dashboard-stats');
+            document.getElementById('main-content').innerHTML = `
+                <h2>Dashboard</h2>
+                <div class="card">
+                    <h3>System Status: <span style="color:${data.kiosk_state === 'READY' ? 'green' : 'red'}">${data.kiosk_state}</span></h3>
+                    <p>Total Revenue: <b>₱${data.total_revenue.toFixed(2)}</b></p>
+                    <p>Total Jobs Processed: <b>${data.total_jobs}</b></p>
+                </div>
+            `;
+        }
+
+        async function loadPricing() {
+            const tiers = await fetchAPI('/pricing');
+            let rows = tiers.map(t => `
+                <tr>
+                    <td>${t.service_name}</td>
+                    <td>${t.min_qty} - ${t.max_qty} pages</td>
+                    <td>
+                        ₱<input type="number" step="0.50" id="price-${t.id}" value="${t.price_per_unit}">
+                    </td>
+                    <td>
+                        <button class="btn" onclick="updatePrice(${t.id})">Save Update</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('main-content').innerHTML = `
+                <h2>Pricing Management</h2>
+                <div class="card">
+                    <table>
+                        <tr><th>Service</th><th>Tier Range</th><th>Price Per Page (₱)</th><th>Action</th></tr>
+                        ${rows}
+                    </table>
+                </div>
+            `;
+        }
+
+        async function updatePrice(tierId) {
+            const newPrice = document.getElementById(`price-${tierId}`).value;
+            await fetchAPI(`/pricing/${tierId}`, 'PUT', { price_per_unit: parseFloat(newPrice) });
+            alert('Price updated successfully!');
+            loadPricing();
+        }
+
+        async function loadHistory() {
+            const history = await fetchAPI('/history');
+            let rows = history.map(h => `
+                <tr>
+                    <td>${h.date}</td>
+                    <td>${h.job_id}</td>
+                    <td>${h.service}</td>
+                    <td>${h.pages}</td>
+                    <td>₱${h.price.toFixed(2)}</td>
+                    <td><b>${h.status}</b></td>
+                </tr>
+            `).join('');
+
+            document.getElementById('main-content').innerHTML = `
+                <h2>Transaction History</h2>
+                <div class="card">
+                    <table>
+                        <tr><th>Date</th><th>Job ID</th><th>Service</th><th>Pages</th><th>Total Charged</th><th>Status</th></tr>
+                        ${rows}
+                    </table>
+                </div>
+            `;
+        }
+
+        // Load dashboard by default
+        loadDashboard();
+    </script>
+</body>
+</html>

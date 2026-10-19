@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Viewport updated to allow zooming and scaling -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JCM Print Vendo</title>
+    <style>
+        :root { --primary: #0056b3; --bg: #f4f7f6; --text: #333; --success: #28a745; --purple: #6f42c1; --orange: #fd7e14; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Body updated to allow natural scrolling instead of overflow: hidden */
+        body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+        
+        .header { background: var(--primary); color: white; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; position: sticky; top: 0; z-index: 100; }
+        
+        /* Screen container updated to flex naturally with scrolling support */
+        .screen { display: none; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 30px 20px; text-align: center; min-height: calc(100vh - 70px); }
+        .active-screen { display: flex; }
+        
+        h1 { font-size: 48px; margin-bottom: 10px; }
+        p { font-size: 24px; color: #666; }
+        
+        .home-options { display: flex; gap: 30px; margin-top: 40px; flex-wrap: wrap; justify-content: center; }
+        .home-card { background: white; padding: 50px 30px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); width: 280px; cursor: pointer; border: 4px solid transparent; transition: 0.2s; }
+        .home-card:active { transform: scale(0.95); }
+        .home-card h2 { font-size: 26px; margin-top: 20px; color: var(--primary); }
+        .card-usb { border-color: var(--primary); }
+        .card-online { border-color: var(--purple); }
+        .card-online h2 { color: var(--purple); }
+        .card-copy { border-color: var(--orange); }
+        .card-copy h2 { color: var(--orange); }
+        
+        .search-container { display: flex; gap: 10px; margin-bottom: 20px; width: 100%; max-width: 800px; }
+        .search-input { flex: 1; padding: 20px; font-size: 24px; border: 2px solid #ddd; border-radius: 10px; }
+        
+        .file-list { width: 100%; max-width: 800px; max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .file-card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-size: 22px; font-weight: bold; cursor: pointer; text-align: left; transition: 0.2s; border: 3px solid transparent; }
+        .file-card:active { border-color: var(--primary); transform: scale(0.98); }
+        
+        .btn { background: var(--primary); color: white; border: none; padding: 20px 40px; font-size: 28px; border-radius: 10px; margin-top: 20px; cursor: pointer; transition: 0.2s; }
+        .btn:active { transform: scale(0.95); }
+        .btn-danger { background: #dc3545; }
+        .btn-success { background: var(--success); }
+        .btn-purple { background: var(--purple); }
+        
+        .config-panel { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 600px; margin-top: 20px; }
+        .config-group { margin-bottom: 30px; }
+        .config-group h3 { font-size: 28px; margin-top: 0; margin-bottom: 15px; color: #444; }
+        .toggle-group { display: flex; gap: 10px; }
+        .btn-toggle { flex: 1; padding: 15px; font-size: 24px; border: 2px solid #ddd; background: white; color: #666; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .btn-toggle.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: bold; }
+        .counter-group { display: flex; align-items: center; justify-content: center; gap: 20px; }
+        .btn-counter { width: 60px; height: 60px; font-size: 36px; border: none; background: #e9ecef; border-radius: 50%; cursor: pointer; color: var(--primary); font-weight: bold; }
+        .counter-value { font-size: 42px; font-weight: bold; width: 60px; }
+        
+        .price-display { font-size: 72px; font-weight: bold; color: var(--success); margin: 20px 0; }
+        .loader { border: 10px solid #f3f3f3; border-top: 10px solid var(--primary); border-radius: 50%; width: 80px; height: 80px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .button-row { display: flex; gap: 20px; justify-content: center; margin-top: 20px; width: 100%; max-width: 600px; }
+        .button-row .btn { flex: 1; }
+        #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 1000; flex-direction: column; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+
+    <div class="header">JCM Print Vendo</div>
+    <div id="loading-overlay"><div class="loader"></div><h2 id="loading-text">Loading...</h2></div>
+
+    <!-- State: READY (HOME) -->
+    <div id="screen-ready" class="screen active-screen">
+        <h1>Welcome</h1>
+        <p>What do you want to do today?</p>
+        <div class="home-options">
+            <div class="home-card card-usb" onclick="checkUSB()">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                <h2>Print from USB</h2>
+            </div>
+            <div class="home-card card-online" onclick="openNasScreen()">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>
+                <h2>Online Print</h2>
+            </div>
+            <div class="home-card card-copy" onclick="openCopyConfig()">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <h2>Photocopy</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- State: USB FILE SELECT -->
+    <div id="screen-usb-files" class="screen">
+        <h1>USB Documents</h1>
+        <div class="file-list" id="usb-container"></div>
+        <button class="btn btn-danger" onclick="cancelToReady()">Cancel</button>
+    </div>
+
+    <!-- State: NAS ONLINE SEARCH -->
+    <div id="screen-nas-search" class="screen">
+        <h1 style="color: var(--purple);">Find Your Online File</h1>
+        <div class="search-container">
+            <input type="text" id="nas-search-input" class="search-input" placeholder="Enter your name..." onkeypress="if(event.key === 'Enter') searchNAS()">
+            <button class="btn btn-purple" style="margin:0;" onclick="searchNAS()">Search</button>
+        </div>
+        <div class="file-list" id="nas-container"></div>
+        <button class="btn btn-danger" style="margin-top: 30px;" onclick="cancelToReady()">Back to Home</button>
+    </div>
+
+    <!-- State: JOB CONFIG (PRINT) -->
+    <div id="screen-config" class="screen">
+        <h1>Print Settings</h1>
+        <p id="config-filename" style="font-weight: bold; color: var(--primary);">document.pdf</p>
+        <p style="margin-top: -15px; font-size: 20px; color: #888;">Detected Pages: <span id="config-pages" style="font-weight:bold; color:var(--text);">1</span></p>
+        
+        <div class="config-panel">
+            <div class="config-group">
+                <h3>Page Range</h3>
+                <input type="text" id="config-page-range" class="search-input" style="width:100%" placeholder="e.g., 1-5, 8 (Leave empty for all)">
+            </div>
+            
+            <div style="display:flex; gap:20px; flex-wrap: wrap;">
+                <div class="config-group" style="flex:1; min-width: 200px;">
+                    <h3>Color Mode</h3>
+                    <div class="toggle-group">
+                        <button id="btn-bw" class="btn-toggle active" onclick="setColorMode('BW', 'PRINT')">Black & White</button>
+                        <button id="btn-color" class="btn-toggle" onclick="setColorMode('COLOR', 'PRINT')">Color</button>
+                    </div>
+                </div>
+                <div class="config-group" style="flex:1; min-width: 200px;">
+                    <h3>Number of Copies</h3>
+                    <div class="counter-group">
+                        <button class="btn-counter" onclick="changeCopies(-1, 'PRINT')">-</button>
+                        <span id="copy-count" class="counter-value">1</span>
+                        <button class="btn-counter" onclick="changeCopies(1, 'PRINT')">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="button-row">
+            <button class="btn btn-danger" onclick="cancelToReady()">Cancel</button>
+            <button class="btn btn-success" onclick="confirmJob()">Confirm & Pay</button>
+        </div>
+    </div>
+    
+    <!-- State: COPY CONFIG -->
+    <div id="screen-copy-config" class="screen">
+        <h1 style="color: var(--orange);">Photocopy Settings</h1>
+        <p>Please place your document on the scanner glass.</p>
+        
+        <div class="config-panel">
+            <div class="config-group">
+                <h3>Color Mode</h3>
+                <div class="toggle-group">
+                    <button id="btn-copy-bw" class="btn-toggle active" onclick="setColorMode('BW', 'COPY')">Black & White</button>
+                    <button id="btn-copy-color" class="btn-toggle" onclick="setColorMode('COLOR', 'COPY')">Color</button>
+                </div>
+            </div>
+            <div class="config-group">
+                <h3>Number of Copies</h3>
+                <div class="counter-group">
+                    <button class="btn-counter" onclick="changeCopies(-1, 'COPY')">-</button>
+                    <span id="copy-copy-count" class="counter-value">1</span>
+                    <button class="btn-counter" onclick="changeCopies(1, 'COPY')">+</button>
+                </div>
+            </div>
+        </div>
+        <div class="button-row">
+            <button class="btn btn-danger" onclick="cancelToReady()">Cancel</button>
+            <button class="btn btn-success" onclick="confirmCopyJob()">Confirm & Pay</button>
+        </div>
+    </div>
+
+    <!-- State: PAYMENT -->
+    <div id="screen-payment" class="screen">
+        <h1>Insert Coins</h1>
+        <div class="price-display">₱<span id="amount-inserted">0.00</span> / ₱<span id="amount-required">0.00</span></div>
+        <button class="btn btn-danger" onclick="cancelJobAPI()">Cancel Transaction</button>
+        <button onclick="simulateCoin()" style="margin-top:50px; padding:10px; background:#ddd; border:none; border-radius:5px;">[DEBUG] Simulate ₱1.00 Drop</button>
+    </div>
+
+    <!-- State: PROCESSING / ERROR -->
+    <div id="screen-processing" class="screen"><div class="loader"></div><h1>Processing...</h1><p>Please wait.</p></div>
+    <div id="screen-error" class="screen"><h1 style="color:#dc3545;">Error</h1><p>Please ask for assistance.</p><button class="btn" onclick="cancelJobAPI()">Reset</button></div>
+
+    <script>
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let ws = new WebSocket(`${protocol}//${window.location.host}/ws/kiosk`);
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.state === 'READY') { hideAllScreens(); document.getElementById('screen-ready').classList.add('active-screen'); } 
+            else if (data.state === 'WAITING_PAYMENT') {
+                hideAllScreens();
+                document.getElementById('screen-payment').classList.add('active-screen');
+                document.getElementById('amount-required').innerText = data.required.toFixed(2);
+                document.getElementById('amount-inserted').innerText = data.inserted.toFixed(2);
+            }
+            else if (data.state === 'PROCESSING') { hideAllScreens(); document.getElementById('screen-processing').classList.add('active-screen'); }
+            else if (data.state === 'ERROR') { hideAllScreens(); document.getElementById('screen-error').classList.add('active-screen'); }
+        };
+        ws.onclose = () => setTimeout(() => window.location.reload(), 3000);
+
+        let currentFilePath = "", currentColorMode = "BW", currentCopies = 1, currentSource = "USB";
+
+        function hideAllScreens() { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen')); document.getElementById('loading-overlay').style.display = 'none'; }
+        function cancelToReady() { hideAllScreens(); document.getElementById('screen-ready').classList.add('active-screen'); }
+
+        async function checkUSB() {
+            document.getElementById('loading-text').innerText = "Scanning USB...";
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const res = await fetch('/api/v1/usb/files');
+                const data = await res.json();
+                if (data.file_count > 0) {
+                    const container = document.getElementById('usb-container');
+                    container.innerHTML = '';
+                    data.files.forEach(file => {
+                        const div = document.createElement('div'); div.className = 'file-card';
+                        div.innerText = `${file.filename} (${file.size_kb} KB)`;
+                        div.onclick = () => fetchPageCountAndOpenConfig(file.path, file.filename, "USB");
+                        container.appendChild(div);
+                    });
+                    hideAllScreens();
+                    document.getElementById('screen-usb-files').classList.add('active-screen');
+                } else { hideAllScreens(); alert("No supported files found on USB."); }
+            } catch (e) { hideAllScreens(); alert("Error reading USB."); }
+        }
+
+        function openNasScreen() {
+            hideAllScreens();
+            document.getElementById('screen-nas-search').classList.add('active-screen');
+            document.getElementById('nas-search-input').value = "";
+            document.getElementById('nas-container').innerHTML = "";
+            searchNAS(); 
+        }
+
+        async function searchNAS() {
+            const query = document.getElementById('nas-search-input').value;
+            const res = await fetch(`/api/v1/nas/files?query=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            const container = document.getElementById('nas-container');
+            container.innerHTML = '';
+            if (data.file_count > 0) {
+                data.files.forEach(file => {
+                    const div = document.createElement('div'); div.className = 'file-card';
+                    div.innerHTML = `<span style="color:var(--purple)">${file.filename}</span> (${file.size_kb} KB)`;
+                    div.onclick = () => fetchPageCountAndOpenConfig(file.path, file.filename, "NAS");
+                    container.appendChild(div);
+                });
+            } else { container.innerHTML = '<p>No files found.</p>'; }
+        }
+
+        async function fetchPageCountAndOpenConfig(filePath, filename, source) {
+            document.getElementById('loading-text').innerText = "Analyzing Document...";
+            document.getElementById('loading-overlay').style.display = 'flex';
+            try {
+                const res = await fetch('/api/v1/usb/analyze', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_path: filePath, source: source })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    currentFilePath = filePath; currentSource = source; currentColorMode = "BW"; currentCopies = 1;
+                    document.getElementById('config-filename').innerText = filename;
+                    document.getElementById('config-pages').innerText = data.pages;
+                    document.getElementById('config-page-range').value = ""; 
+                    updateConfigUI('PRINT');
+                    hideAllScreens();
+                    document.getElementById('screen-config').classList.add('active-screen');
+                } else { hideAllScreens(); alert("Failed to analyze document."); }
+            } catch (e) { hideAllScreens(); alert("Network error."); }
+        }
+
+        function openCopyConfig() {
+            currentColorMode = "BW"; currentCopies = 1;
+            updateConfigUI('COPY');
+            hideAllScreens();
+            document.getElementById('screen-copy-config').classList.add('active-screen');
+        }
+
+        function setColorMode(mode, context) { currentColorMode = mode; updateConfigUI(context); }
+        function changeCopies(delta, context) { currentCopies = Math.max(1, Math.min(50, currentCopies + delta)); updateConfigUI(context); }
+        
+        function updateConfigUI(context) {
+            if (context === 'PRINT') {
+                document.getElementById('copy-count').innerText = currentCopies;
+                document.getElementById('btn-bw').classList.toggle('active', currentColorMode === 'BW');
+                document.getElementById('btn-color').classList.toggle('active', currentColorMode === 'COLOR');
+            } else {
+                document.getElementById('copy-copy-count').innerText = currentCopies;
+                document.getElementById('btn-copy-bw').classList.toggle('active', currentColorMode === 'BW');
+                document.getElementById('btn-copy-color').classList.toggle('active', currentColorMode === 'COLOR');
+            }
+        }
+
+        async function confirmJob() {
+            document.getElementById('loading-text').innerText = "Preparing Print Job...";
+            document.getElementById('loading-overlay').style.display = 'flex';
+            
+            const rangeInput = document.getElementById('config-page-range').value;
+            const payload = { 
+                file_path: currentFilePath, 
+                source: currentSource, 
+                copies: currentCopies, 
+                color_mode: currentColorMode,
+                page_range: rangeInput
+            };
+            
+            const res = await fetch('/api/v1/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!res.ok) { alert("Failed to create job."); cancelToReady(); }
+        }
+        
+        async function confirmCopyJob() {
+            document.getElementById('loading-text').innerText = "Preparing Photocopy...";
+            document.getElementById('loading-overlay').style.display = 'flex';
+            const payload = { copies: currentCopies, color_mode: currentColorMode };
+            const res = await fetch('/api/v1/jobs/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!res.ok) { alert("Failed to create copy job."); cancelToReady(); }
+        }
+
+        async function cancelJobAPI() { await fetch('/api/v1/jobs/cancel', { method: 'POST' }); }
+        async function simulateCoin() { await fetch('/api/v1/jobs/insert-coin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: 1.0 }) }); }
+    </script>
+</body>
+</html>
